@@ -107,7 +107,5 @@ npm run build
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
 
 ## Acknowledgments
-
-- Thanks to all contributors who have helped shape Yapper
 - Built with modern web technologies and best practices
-- Inspired by the need for location-based community chat applications
+- Inspired by curiosity and the need for location-based community chat applications
