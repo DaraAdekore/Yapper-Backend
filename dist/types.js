@@ -14,4 +14,7 @@ var MessageType;
     MessageType["LOAD_ROOM_MESSAGES"] = "LOAD_ROOM_MESSAGES";
     MessageType["ROOMS_UPDATE"] = "ROOMS_UPDATE";
     MessageType["NEARBY_ROOMS"] = "NEARBY_ROOMS";
+    MessageType["LEAVE_ROOM"] = "LEAVE_ROOM";
+    MessageType["LEAVE_ROOM_CONFIRM"] = "LEAVE_ROOM_CONFIRM";
+    MessageType["USER_LEFT"] = "USER_LEFT";
 })(MessageType || (exports.MessageType = MessageType = {}));

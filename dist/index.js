@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -20,6 +11,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const pg_1 = require("pg");
 const cors_1 = __importDefault(require("cors"));
+const types_1 = require("./types");
 const websocket_2 = require("./websocket");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -39,31 +31,31 @@ const pool = new pg_1.Pool({
 });
 const server = http_1.default.createServer(app);
 (0, websocket_1.setupWebSocket)(server, pool);
-const getUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserByEmail = async (email) => {
     const query = `SELECT * FROM users WHERE email = $1`;
-    const result = yield pool.query(query, [email]);
+    const result = await pool.query(query, [email]);
     return result.rows[0];
-});
+};
 const encodedPassword = (password) => {
     // Simple base64 encoding with a salt
     const salt = '4509809fgdjkn4454j5jkj62jk6'; // In production, use a proper random salt per user
     const encoded = Buffer.from(salt + password).toString('base64');
     return encoded;
 };
-const updateUserLocation = (userId, latitude, longitude) => __awaiter(void 0, void 0, void 0, function* () {
+const updateUserLocation = async (userId, latitude, longitude) => {
     const query = `
         UPDATE users
         SET latitude = $1, longitude = $2
         WHERE id = $3
     `;
     const values = [latitude, longitude, userId];
-    yield pool.query(query, values); // Replace `db.query` with your database query function
-});
-app.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    await pool.query(query, values); // Replace `db.query` with your database query function
+};
+app.post('/login', async (req, res) => {
     const { email, password, latitude, longitude } = req.body;
     try {
         // Fetch user by email
-        const user = yield getUserByEmail(email);
+        const user = await getUserByEmail(email);
         if (!user) {
             res.status(404).send('User not found');
             return;
@@ -95,8 +87,8 @@ app.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         console.error('Error during login:', error);
         res.status(500).send('Internal server error');
     }
-}));
-app.post('/location', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+});
+app.post('/location', async (req, res) => {
     const { latitude, longitude, id } = req.body;
     const query = `
         UPDATE users
@@ -104,16 +96,16 @@ app.post('/location', (req, res) => __awaiter(void 0, void 0, void 0, function* 
         WHERE id = $3
     `;
     try {
-        const result = yield pool.query(query, [latitude, longitude, id]);
+        const result = await pool.query(query, [latitude, longitude, id]);
         res.status(200).json({ success: true, message: 'Location updated' });
     }
     catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
-}));
+});
 // Define the endpoint
-app.post('/rooms', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/rooms', async (req, res) => {
     const { userLat, userLng, radius, searchT, userId } = req.body;
     if (!userLat || !userLng) {
         res.status(400).send({ error: 'Latitude and longitude are required.' });
@@ -151,7 +143,7 @@ app.post('/rooms', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
                 COS(RADIANS(r.longitude) - RADIANS($2)) +
                 SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
-            ) <= $3 OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id))
+            )) <= $3 OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id))
         `;
         const queryParams = [userLat, userLng, radius, userId];
         if (searchT === null || searchT === void 0 ? void 0 : searchT.length) {
@@ -159,21 +151,21 @@ app.post('/rooms', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             queryParams.push(...searchT.map((term) => `%${term}%`));
         }
         query += ` ORDER BY distance ASC;`;
-        const { rows } = yield pool.query(query, queryParams);
+        const { rows } = await pool.query(query, queryParams);
         res.status(200).json(rows);
     }
     catch (err) {
         console.error(err);
         res.status(500).send({ error: 'Failed to fetch rooms.' });
     }
-}));
-app.post("/leave-room", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+});
+app.post("/leave-room", async (req, res) => {
     const { userId, roomId } = req.body;
     if (!userId || !roomId) {
         res.status(400).json({ error: "User ID and Room ID are required" });
     }
     try {
-        const result = yield pool.query(`DELETE FROM user_rooms WHERE user_id = $1 AND room_id = $2 RETURNING *`, [userId, roomId]);
+        const result = await pool.query(`DELETE FROM user_rooms WHERE user_id = $1 AND room_id = $2 RETURNING *`, [userId, roomId]);
         if (result.rowCount === 0) {
             res.status(404).json({ error: "User is not in the specified room" });
         }
@@ -183,15 +175,15 @@ app.post("/leave-room", (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error("Error leaving room:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-}));
-app.post("/joined-rooms", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+});
+app.post("/joined-rooms", async (req, res) => {
     const { userId } = req.body;
     console.log("Received userId:", userId);
     if (!userId || userId === "null" || userId.trim() === "") {
         res.status(400).json({ error: "Valid user ID is required" });
     }
     try {
-        const result = yield pool.query(`SELECT r.id, r.name, r.latitude, r.longitude, ur.joined_at 
+        const result = await pool.query(`SELECT r.id, r.name, r.latitude, r.longitude, ur.joined_at 
              FROM rooms r
              JOIN user_rooms ur ON r.id = ur.room_id
              WHERE ur.user_id = $1
@@ -203,13 +195,13 @@ app.post("/joined-rooms", (req, res) => __awaiter(void 0, void 0, void 0, functi
         console.error("Error fetching joined rooms:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-}));
-app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+});
+app.post('/register', async (req, res) => {
     const { username, email, password, latitude, longitude } = req.body;
     const hashedPassword = encodedPassword(password);
     const query = `INSERT INTO users (username, email, password_hash, latitude, longitude) VALUES ($1, $2, $3, $4, $5)`;
-    const result = yield pool.query(query, [username, email, hashedPassword, latitude, longitude]);
-    const user = yield getUserByEmail(email);
+    const result = await pool.query(query, [username, email, hashedPassword, latitude, longitude]);
+    const user = await getUserByEmail(email);
     const token = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.cookie('token', token, {
         httpOnly: true,
@@ -217,7 +209,7 @@ app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* 
         sameSite: 'none',
     });
     res.status(200).send({ id: user.id, username: user.username, email: user.email, latitude: user.latitude, longitude: user.longitude, token: true });
-}));
+});
 app.post('/logout', (req, res) => {
     res.clearCookie('token', {
         httpOnly: true,
@@ -241,7 +233,7 @@ app.get('/verify-token', (req, res) => {
         return;
     }
 });
-app.post('/api/rooms/join', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/api/rooms/join', async (req, res) => {
     var _a, _b;
     const { userId, roomId } = req.body;
     if (!roomId) {
@@ -249,7 +241,7 @@ app.post('/api/rooms/join', (req, res) => __awaiter(void 0, void 0, void 0, func
     }
     try {
         // Check if room exists and get room data with creator info
-        const roomResult = yield pool.query(`
+        const roomResult = await pool.query(`
             SELECT r.*, creator.username as creator_username
             FROM rooms r
             LEFT JOIN users creator ON r.creator_id = creator.id
@@ -260,9 +252,9 @@ app.post('/api/rooms/join', (req, res) => __awaiter(void 0, void 0, void 0, func
             res.status(404).json({ error: "Room not found" });
         }
         // Add user to room
-        yield pool.query(`INSERT INTO user_rooms (user_id, room_id) VALUES ($1, $2)`, [userId, roomId]);
+        await pool.query(`INSERT INTO user_rooms (user_id, room_id) VALUES ($1, $2)`, [userId, roomId]);
         // Get messages with user info
-        const messagesResult = yield pool.query(`
+        const messagesResult = await pool.query(`
             SELECT 
                 m.id,
                 m.content as text,
@@ -280,7 +272,7 @@ app.post('/api/rooms/join', (req, res) => __awaiter(void 0, void 0, void 0, func
         }
         (_a = websocket_2.userRooms.get(userId)) === null || _a === void 0 ? void 0 : _a.add(roomId);
         // Get joining user's username
-        const userResult = yield pool.query('SELECT username FROM users WHERE id = $1', [userId]);
+        const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [userId]);
         const username = (_b = userResult.rows[0]) === null || _b === void 0 ? void 0 : _b.username;
         // Notify other users
         const roomConnections = websocket_2.connections.get(roomId);
@@ -310,7 +302,165 @@ app.post('/api/rooms/join', (req, res) => __awaiter(void 0, void 0, void 0, func
         console.error('Error joining room:', error);
         res.status(500).json({ error: "Failed to join room" });
     }
-}));
+});
+app.get('/api/search-rooms', async (req, res) => {
+    const { radius, searchTerm, userId } = req.query;
+    const searchTermStr = (searchTerm === null || searchTerm === void 0 ? void 0 : searchTerm.toString()) || '';
+    const radiusNum = radius ? Number(radius) : null;
+    if (!userId) {
+        res.status(400).json({ error: 'userId is required.' });
+        return;
+    }
+    try {
+        // Validate user exists and has coordinates
+        const userResult = await pool.query(`SELECT latitude, longitude 
+             FROM users 
+             WHERE id = $1 
+             AND latitude IS NOT NULL 
+             AND longitude IS NOT NULL`, [userId]);
+        if (userResult.rows.length === 0) {
+            res.status(404).json({
+                error: userResult.rowCount === 0
+                    ? 'User not found'
+                    : 'User location not set'
+            });
+            return;
+        }
+        const { latitude: userLat, longitude: userLng } = userResult.rows[0];
+        const queryParams = [userLat, userLng];
+        let whereClauses = [];
+        let paramIndex = 2;
+        // Handle search term filter
+        if (searchTermStr.trim()) {
+            paramIndex++;
+            whereClauses.push(`r.name ILIKE $${paramIndex}`);
+            queryParams.push(`%${searchTermStr.trim()}%`);
+        }
+        // Handle radius filter
+        if (radiusNum && !isNaN(radiusNum)) {
+            paramIndex++;
+            whereClauses.push(`
+                6371 * ACOS(
+                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
+                    COS(RADIANS(r.longitude) - RADIANS($2)) +
+                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                ) <= $${paramIndex}
+            `);
+            queryParams.push(radiusNum);
+        }
+        // Construct final query
+        const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+        const query = `
+            SELECT 
+                r.id,
+                r.name,
+                r.latitude::float,
+                r.longitude::float,
+                r.creator_id,
+                u.username AS creator_username,
+                r.created_at,
+                (6371 * ACOS(
+                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
+                    COS(RADIANS(r.longitude) - RADIANS($2)) +
+                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                )) AS distance
+            FROM rooms r
+            LEFT JOIN users u ON r.creator_id = u.id
+            ${whereClause}
+            ORDER BY distance ASC, r.created_at DESC
+        `;
+        const result = await pool.query(query, queryParams);
+        const rooms = result.rows.map(room => (Object.assign(Object.assign({}, room), { distance: Math.round(room.distance * 10) / 10 })));
+        res.json({
+            rooms,
+            total: rooms.length,
+            filters: {
+                radius: radiusNum,
+                searchTerm: searchTermStr.trim() || null
+            }
+        });
+    }
+    catch (err) {
+        console.error('Search error:', err);
+        res.status(500).json({ error: 'Failed to search rooms' });
+    }
+});
+app.get('/api/users/:id', async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const query = `
+            SELECT 
+                id,
+                username,
+                email,
+                latitude,
+                longitude,
+                created_at
+            FROM users 
+            WHERE id = $1
+        `;
+        const result = await pool.query(query, [userId]);
+        if (result.rows.length === 0) {
+            res.status(404).json({
+                error: 'User not found'
+            });
+        }
+        // Format the user data, excluding sensitive information
+        const user = {
+            id: result.rows[0].id,
+            username: result.rows[0].username,
+            email: result.rows[0].email,
+            latitude: parseFloat(result.rows[0].latitude),
+            longitude: parseFloat(result.rows[0].longitude),
+            createdAt: result.rows[0].created_at
+        };
+        res.status(200).json(user);
+    }
+    catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(500).json({
+            error: 'Failed to fetch user'
+        });
+    }
+});
+const CLEANUP_INTERVAL = 1000 * 60 * 5; // Run every 5 minutes
+const cleanupExpiredRooms = async () => {
+    try {
+        // Delete expired rooms and get their IDs
+        const { rows } = await pool.query(`
+            WITH deleted AS (
+                DELETE FROM rooms 
+                WHERE created_at < NOW() - INTERVAL '24 hours'
+                RETURNING id
+            )
+            SELECT id FROM deleted;
+        `);
+        if (rows.length > 0) {
+            console.log(`Cleaned up ${rows.length} expired rooms`);
+            // Clean up WebSocket connections for deleted rooms
+            rows.forEach(({ id }) => {
+                if (websocket_2.connections.has(id)) {
+                    const roomConnections = websocket_2.connections.get(id);
+                    roomConnections === null || roomConnections === void 0 ? void 0 : roomConnections.forEach(ws => {
+                        ws.send(JSON.stringify({
+                            type: types_1.MessageType.ERROR,
+                            message: 'Room has expired'
+                        }));
+                        ws.close();
+                    });
+                    websocket_2.connections.delete(id);
+                }
+            });
+        }
+    }
+    catch (error) {
+        console.error('Error cleaning up expired rooms:', error);
+    }
+};
+// Start the cleanup interval after server initialization
+setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
+// Run initial cleanup when server starts
+cleanupExpiredRooms();
 server.listen(port, () => {
     console.log(`Yapper backend running on http://localhost:${port}`);
 });

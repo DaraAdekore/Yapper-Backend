@@ -1,14 +1,15 @@
-import express from 'express';
+import express, { Request, Response, RequestHandler } from 'express';
 import http from 'http';
 import { setupWebSocket } from './websocket';
 import cookieParser from 'cookie-parser';
-import { Request, Response } from 'express';
+import { Request as ExpressRequest } from 'express';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { Pool } from 'pg';
 import cors from 'cors';
 import { MessageType } from './types';
 import { connections, userRooms } from './websocket';
+import qs from 'qs';
 
 dotenv.config();
 
@@ -138,19 +139,19 @@ app.post('/rooms', async (req, res) => {
                 FROM messages m 
                 JOIN users u ON m.user_id = u.id 
                 WHERE m.room_id = r.id) as messages,
-                (6371 * ACOS(
-                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
-                    COS(RADIANS(r.longitude) - RADIANS($2)) +
-                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                (6371 * acos(
+                    cos(radians($1)) * cos(radians(r.latitude)) *
+                    cos(radians(r.longitude) - radians($2)) +
+                    sin(radians($1)) * sin(radians(r.latitude))
                 )) AS distance,
                 EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id) as "isJoined"
             FROM rooms r
             LEFT JOIN users creator ON r.creator_id = creator.id
-            WHERE (6371 * ACOS(
-                COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
-                COS(RADIANS(r.longitude) - RADIANS($2)) +
-                SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
-            ) <= $3 OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id))
+            WHERE (6371 * acos(
+                cos(radians($1)) * cos(radians(r.latitude)) *
+                cos(radians(r.longitude) - radians($2)) +
+                sin(radians($1)) * sin(radians(r.latitude))
+            ) <= $3) OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id)
         `;
 
         const queryParams = [userLat, userLng, radius, userId];
@@ -336,6 +337,192 @@ app.post('/api/rooms/join', async (req, res) => {
         res.status(500).json({ error: "Failed to join room" });
     }
 });
+
+app.get('/api/search-rooms', async (req, res) => {
+    const { radius, searchTerm, userId } = req.query;
+    const searchTermStr = searchTerm?.toString() || '';
+    const radiusNum = radius ? Number(radius) : null;
+    
+    if (!userId) {
+        res.status(400).json({ error: 'userId is required.' });
+        return;
+    }
+
+    try {
+        // Validate user exists and has coordinates
+        const userResult = await pool.query(
+            `SELECT latitude, longitude 
+             FROM users 
+             WHERE id = $1 
+             AND latitude IS NOT NULL 
+             AND longitude IS NOT NULL`,
+            [userId]
+        );
+        
+        if (userResult.rows.length === 0) {
+            res.status(404).json({
+                error: userResult.rowCount === 0 
+                    ? 'User not found' 
+                    : 'User location not set'
+            });
+            return;
+        }
+
+        const { latitude: userLat, longitude: userLng } = userResult.rows[0];
+        const queryParams = [userLat, userLng];
+        let whereClauses = [];
+        let paramIndex = 2;
+
+        // Handle search term filter
+        if (searchTermStr.trim()) {
+            paramIndex++;
+            whereClauses.push(`r.name ILIKE $${paramIndex}`);
+            queryParams.push(`%${searchTermStr.trim()}%`);
+        }
+
+        // Handle radius filter
+        if (radiusNum && !isNaN(radiusNum)) {
+            paramIndex++;
+            whereClauses.push(`
+                6371 * ACOS(
+                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
+                    COS(RADIANS(r.longitude) - RADIANS($2)) +
+                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                ) <= $${paramIndex}
+            `);
+            queryParams.push(radiusNum);
+        }
+
+        // Construct final query
+        const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+        const query = `
+            SELECT 
+                r.id,
+                r.name,
+                r.latitude::float,
+                r.longitude::float,
+                r.creator_id,
+                u.username AS creator_username,
+                r.created_at,
+                (6371 * ACOS(
+                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
+                    COS(RADIANS(r.longitude) - RADIANS($2)) +
+                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                )) AS distance
+            FROM rooms r
+            LEFT JOIN users u ON r.creator_id = u.id
+            ${whereClause}
+            ORDER BY distance ASC, r.created_at DESC
+        `;
+
+        const result = await pool.query(query, queryParams);
+        const rooms = result.rows.map(room => ({
+            ...room,
+            distance: Math.round(room.distance * 10) / 10
+        }));
+
+        res.json({
+            rooms,
+            total: rooms.length,
+            filters: {
+                radius: radiusNum,
+                searchTerm: searchTermStr.trim() || null
+            }
+        });
+
+    } catch (err) {
+        console.error('Search error:', err);
+        res.status(500).json({ error: 'Failed to search rooms' });
+    }
+});
+
+app.get('/api/users/:id', async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        const query = `
+            SELECT 
+                id,
+                username,
+                email,
+                latitude,
+                longitude,
+                created_at
+            FROM users 
+            WHERE id = $1
+        `;
+
+        const result = await pool.query(query, [userId]);
+
+        if (result.rows.length === 0) {
+            res.status(404).json({
+                error: 'User not found'
+            });
+        }
+
+        // Format the user data, excluding sensitive information
+        const user = {
+            id: result.rows[0].id,
+            username: result.rows[0].username,
+            email: result.rows[0].email,
+            latitude: parseFloat(result.rows[0].latitude),
+            longitude: parseFloat(result.rows[0].longitude),
+            createdAt: result.rows[0].created_at
+        };
+
+        res.status(200).json(user);
+
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(500).json({
+            error: 'Failed to fetch user'
+        });
+    }
+});
+
+const CLEANUP_INTERVAL = 1000 * 60 * 5; // Run every 5 minutes
+
+const cleanupExpiredRooms = async () => {
+    try {
+        // Delete expired rooms and get their IDs
+        const { rows } = await pool.query(`
+            WITH deleted AS (
+                DELETE FROM rooms 
+                WHERE created_at < NOW() - INTERVAL '24 hours'
+                RETURNING id
+            )
+            SELECT id FROM deleted;
+        `);
+
+        if (rows.length > 0) {
+            console.log(`Cleaned up ${rows.length} expired rooms`);
+            
+            // Clean up WebSocket connections for deleted rooms
+            rows.forEach(({ id }) => {
+                if (connections.has(id)) {
+                    const roomConnections = connections.get(id);
+                    roomConnections?.forEach(ws => {
+                        ws.send(JSON.stringify({
+                            type: MessageType.ERROR,
+                            message: 'Room has expired'
+                        }));
+                        ws.close();
+                    });
+                    connections.delete(id);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cleaning up expired rooms:', error);
+    }
+};
+
+// Start the cleanup interval after server initialization
+setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
+
+// Run initial cleanup when server starts
+cleanupExpiredRooms();
+
 server.listen(port, () => {
     console.log(`Yapper backend running on http://localhost:${port}`);
 });

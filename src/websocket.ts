@@ -262,13 +262,13 @@ export const setupWebSocket = (server: Server, pool: Pool) => {
                             try {
                                 const { rows } = await pool.query(
                                     `SELECT r.*, 
-                                        (6371 * acos(cos(radians($1)) * cos(radians(latitude)) * 
-                                        cos(radians(longitude) - radians($2)) + 
-                                        sin(radians($1)) * sin(radians(latitude)))) AS distance
+                                        (6371 * acos(cos(radians($1)) * cos(radians(r.latitude)) * 
+                                        cos(radians(r.longitude) - radians($2)) + 
+                                        sin(radians($1)) * sin(radians(r.latitude)))) AS distance
                                      FROM rooms r
-                                     WHERE (6371 * acos(cos(radians($1)) * cos(radians(latitude)) * 
-                                           cos(radians(longitude) - radians($2)) + 
-                                           sin(radians($1)) * sin(radians(latitude)))) <= $3`,
+                                     WHERE (6371 * acos(cos(radians($1)) * cos(radians(r.latitude)) * 
+                                           cos(radians(r.longitude) - radians($2)) + 
+                                           sin(radians($1)) * sin(radians(r.latitude)))) <= $3`,
                                     [data.latitude, data.longitude, data.radius || 5]
                                 );
 
@@ -283,36 +283,43 @@ export const setupWebSocket = (server: Server, pool: Pool) => {
                         break;
 
                     case MessageType.JOIN_ROOM:
+                        console.log(data);
                         if (data.roomId && data.userId) {
                             try {
-                                const userResult = await pool.query(
-                                    'SELECT username FROM users WHERE id = $1',
-                                    [data.userId]
-                                );
-                                const username = userResult.rows[0]?.username;
-
-                                await pool.query(
-                                    `INSERT INTO user_rooms (user_id, room_id) 
-                                     VALUES ($1, $2) 
-                                     ON CONFLICT (user_id, room_id) DO NOTHING`,
+                                // First check if user is already in the room
+                                const existingMembership = await pool.query(
+                                    `SELECT id FROM user_rooms WHERE user_id = $1 AND room_id = $2`,
                                     [data.userId, data.roomId]
                                 );
+                                console.log(existingMembership.rows);
+                                if (existingMembership.rows.length === 0) {
+                                    // Get user info
+                                    const userResult = await pool.query(
+                                        'SELECT username FROM users WHERE id = $1',
+                                        [data.userId]
+                                    );
+                                    const username = userResult.rows[0]?.username;
 
-                                // Update connection maps
-                                if (!userRooms.has(data.userId)) {
-                                    userRooms.set(data.userId, new Set());
-                                }
-                                userRooms.get(data.userId)?.add(data.roomId);
+                                    // Insert new membership
+                                    await pool.query(
+                                        `INSERT INTO user_rooms (user_id, room_id) 
+                                         VALUES ($1, $2)`,
+                                        [data.userId, data.roomId]
+                                    );
 
-                                if (!connections.has(data.roomId)) {
-                                    connections.set(data.roomId, new Set());
-                                }
-                                connections.get(data.roomId)?.add(ws);
+                                    // Update WebSocket connections
+                                    if (!userRooms.has(data.userId)) {
+                                        userRooms.set(data.userId, new Set());
+                                    }
+                                    userRooms.get(data.userId)?.add(data.roomId);
 
-                                // Notify room members
-                                const roomConnections = connections.get(data.roomId);
-                                if (roomConnections) {
-                                    roomConnections.forEach(client => {
+                                    if (!connections.has(data.roomId)) {
+                                        connections.set(data.roomId, new Set());
+                                    }
+                                    connections.get(data.roomId)?.add(ws);
+
+                                    // Notify room members
+                                    connections.get(data.roomId)?.forEach((client) => {
                                         client.send(JSON.stringify({
                                             type: MessageType.USER_JOINED,
                                             roomId: data.roomId,
@@ -326,6 +333,64 @@ export const setupWebSocket = (server: Server, pool: Pool) => {
                                 ws.send(JSON.stringify({
                                     type: MessageType.ERROR,
                                     message: 'Failed to join room'
+                                }));
+                            }
+                        }
+                        break;
+
+                    case MessageType.LEAVE_ROOM:
+                        if (data.roomId && data.userId) {
+                            try {
+                                // Get user info for notification
+                                const userResult = await pool.query(
+                                    'SELECT username FROM users WHERE id = $1',
+                                    [data.userId]
+                                );
+                                const username = userResult.rows[0]?.username;
+
+                                // Remove from user_rooms table
+                                await pool.query(
+                                    `DELETE FROM user_rooms 
+                                     WHERE user_id = $1 AND room_id = $2`,
+                                    [data.userId, data.roomId]
+                                );
+
+                                // Update WebSocket connections
+                                userRooms.get(data.userId)?.delete(data.roomId);
+                                if (userRooms.get(data.userId)?.size === 0) {
+                                    userRooms.delete(data.userId);
+                                }
+
+                                const roomConnections = connections.get(data.roomId);
+                                if (roomConnections) {
+                                    roomConnections.delete(ws);
+                                    if (roomConnections.size === 0) {
+                                        connections.delete(data.roomId);
+                                    }
+
+                                    // Notify remaining users in the room
+                                    roomConnections.forEach((client) => {
+                                        client.send(JSON.stringify({
+                                            type: MessageType.USER_LEFT,
+                                            roomId: data.roomId,
+                                            userId: data.userId,
+                                            username: username
+                                        }));
+                                    });
+                                }
+
+                                // Confirm to the leaving user
+                                ws.send(JSON.stringify({
+                                    type: MessageType.LEAVE_ROOM_CONFIRM,
+                                    roomId: data.roomId,
+                                    success: true
+                                }));
+
+                            } catch (error) {
+                                console.error('Error leaving room:', error);
+                                ws.send(JSON.stringify({
+                                    type: MessageType.ERROR,
+                                    message: 'Failed to leave room'
                                 }));
                             }
                         }
