@@ -16,18 +16,12 @@ dotenv.config();
 const app = express();
 app.use(cookieParser());
 app.use(
-    cors({
-        origin: ['https://yapper-2d1p.onrender.com', 'http://localhost:3000'],  // Allow both production and local
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
-        exposedHeaders: ['Set-Cookie']
-    })
-);
+    cors())
+;
 app.use(express.json());
 
 // Add OPTIONS handling for preflight requests
-app.options('*', cors());
+// app.options('*', cors());
 
 const port = process.env.PORT;
 const pool = new Pool({

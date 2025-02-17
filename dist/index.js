@@ -24,16 +24,10 @@ const websocket_2 = require("./websocket");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
-app.use((0, cors_1.default)({
-    origin: ['https://yapper-2d1p.onrender.com', 'http://localhost:3000'], // Allow both production and local
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
-    exposedHeaders: ['Set-Cookie']
-}));
+app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // Add OPTIONS handling for preflight requests
-app.options('*', (0, cors_1.default)());
+// app.options('*', cors());
 const port = process.env.PORT;
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
