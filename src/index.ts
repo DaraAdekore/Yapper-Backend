@@ -17,10 +17,10 @@ const app = express();
 app.use(cookieParser());
 app.use(cors({
     credentials: true,
-    origin: 'https://yapper-2d1p.onrender.com',
+    origin: 'https://yapper-2d1p.onrender.com', // Ensure this matches your frontend URL exactly
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept', 'Access-Control-Allow-Origin'],
-    exposedHeaders: ['Set-Cookie']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
+    exposedHeaders: ['Set-Cookie'],
 }));
 app.use(express.json());
 
@@ -301,8 +301,8 @@ app.post('/register', async (req, res) => {
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
     res.cookie('token', token, {
         httpOnly: true,
-        secure: true,
-        sameSite: 'none',
+        secure: true, // Ensure this is true in production (requires HTTPS)
+        sameSite: 'none', // Required for cross-origin cookies
     });
     res.status(200).send({ id: user.id, username: user.username, email: user.email, latitude: user.latitude, longitude: user.longitude, token: true });
 });
