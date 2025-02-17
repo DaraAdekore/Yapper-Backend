@@ -25,13 +25,13 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
-    origin: `${process.env.FRONTEND_URL}` || 'http://localhost:3312',
+    origin: `${process.env.FRONTEND_URL}:${process.env.PORT}` || `http://localhost:${process.env.PORT}`,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 app.use(express_1.default.json());
-const port = 3312;
+const port = process.env.PORT;
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
