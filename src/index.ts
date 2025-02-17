@@ -18,8 +18,8 @@ app.use(cookieParser());
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 app.use(
     cors({
-        origin: [FRONTEND_URL], // Can be an array of allowed origins
-        credentials: true, // Keep this if you're using cookies/auth
+        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
     })
@@ -525,6 +525,15 @@ setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
 
 // Run initial cleanup when server starts
 cleanupExpiredRooms();
+
+// Add after pool creation
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+        console.error('Database connection failed:', err);
+    } else {
+        console.log('Database connected');
+    }
+});
 
 server.listen(port, () => {
     console.log(`Yapper backend running on http://localhost:${port}`);
