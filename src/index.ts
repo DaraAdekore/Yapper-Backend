@@ -32,6 +32,76 @@ const pool = new Pool({
         rejectUnauthorized: false // Required for Render's PostgreSQL
     }
 });
+
+// Test database connection
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+        console.error('Database connection failed:', err);
+    } else {
+        console.log('Database connected');
+    }
+});
+
+// Cleanup configuration
+const CLEANUP_INTERVAL = 1000 * 60 * 5; // 5 minutes
+const ROOM_EXPIRY = '24 hours';
+
+const cleanupExpiredRooms = async () => {
+    /* Temporarily disabled room cleanup
+    try {
+        // First delete messages from expired rooms
+        await pool.query(`
+            DELETE FROM messages 
+            WHERE room_id IN (
+                SELECT id FROM rooms 
+                WHERE created_at < NOW() - INTERVAL '${ROOM_EXPIRY}'
+            )
+        `);
+
+        // Then delete user_rooms entries
+        await pool.query(`
+            DELETE FROM user_rooms 
+            WHERE room_id IN (
+                SELECT id FROM rooms 
+                WHERE created_at < NOW() - INTERVAL '${ROOM_EXPIRY}'
+            )
+        `);
+
+        // Finally delete the rooms and get their IDs
+        const { rows } = await pool.query(`
+            WITH deleted AS (
+                DELETE FROM rooms 
+                WHERE created_at < NOW() - INTERVAL '${ROOM_EXPIRY}'
+                RETURNING id
+            )
+            SELECT id FROM deleted;
+        `);
+
+        if (rows.length > 0) {
+            console.log(`Cleaned up ${rows.length} expired rooms`);
+            
+            // Clean up WebSocket connections
+            rows.forEach(({ id }) => {
+                if (connections.has(id)) {
+                    const roomConnections = connections.get(id);
+                    roomConnections?.forEach(ws => {
+                        ws.send(JSON.stringify({
+                            type: MessageType.ERROR,
+                            message: 'Room has expired'
+                        }));
+                        ws.close();
+                    });
+                    connections.delete(id);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cleaning up expired rooms:', error);
+    }
+    */
+    console.log('Room cleanup temporarily disabled');
+};
+
 const server = http.createServer(app);
 
 setupWebSocket(server, pool);
@@ -483,57 +553,9 @@ app.get('/api/users/:id', async (req, res) => {
     }
 });
 
-const CLEANUP_INTERVAL = 1000 * 60 * 5; // Run every 5 minutes
-
-const cleanupExpiredRooms = async () => {
-    try {
-        // Delete expired rooms and get their IDs
-        const { rows } = await pool.query(`
-            WITH deleted AS (
-                DELETE FROM rooms 
-                WHERE created_at < NOW() - INTERVAL '24 hours'
-                RETURNING id
-            )
-            SELECT id FROM deleted;
-        `);
-
-        if (rows.length > 0) {
-            console.log(`Cleaned up ${rows.length} expired rooms`);
-            
-            // Clean up WebSocket connections for deleted rooms
-            rows.forEach(({ id }) => {
-                if (connections.has(id)) {
-                    const roomConnections = connections.get(id);
-                    roomConnections?.forEach(ws => {
-                        ws.send(JSON.stringify({
-                            type: MessageType.ERROR,
-                            message: 'Room has expired'
-                        }));
-                        ws.close();
-                    });
-                    connections.delete(id);
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error cleaning up expired rooms:', error);
-    }
-};
-
-// Start the cleanup interval after server initialization
-setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
-
-// Run initial cleanup when server starts
-cleanupExpiredRooms();
-
-// Add after pool creation
-pool.query('SELECT NOW()', (err, res) => {
-    if (err) {
-        console.error('Database connection failed:', err);
-    } else {
-        console.log('Database connected');
-    }
-});
+// Temporarily disabled
+// setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
+// cleanupExpiredRooms();
 
 server.listen(port, () => {
     console.log(`Yapper backend running on http://localhost:${port}`);
