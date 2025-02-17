@@ -26,20 +26,7 @@ const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
     credentials: true,
-    origin: [
-        'https://yapper-2d1p.onrender.com', // Frontend base
-        'https://yapper-2d1p.onrender.com/login', // Auth endpoints
-        'https://yapper-2d1p.onrender.com/register',
-        'https://yapper-2d1p.onrender.com/logout',
-        'https://yapper-2d1p.onrender.com/verify-token',
-        'https://yapper-2d1p.onrender.com/rooms', // Room endpoints
-        'https://yapper-2d1p.onrender.com/api/rooms/join',
-        'https://yapper-2d1p.onrender.com/api/search-rooms',
-        'https://yapper-2d1p.onrender.com/api/users/:id', // User endpoints
-        'https://yapper-backend-pomo.onrender.com', // Backend base
-        'http://localhost:3000', // Local development
-        'http://localhost:3312'
-    ],
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
     exposedHeaders: ['Set-Cookie'],
