@@ -25,7 +25,7 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL,
+    origin: [process.env.FRONTEND_URL || `http://localhost:${process.env.PORT}`],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
@@ -504,5 +504,5 @@ app.get('/api/users/:id', (req, res) => __awaiter(void 0, void 0, void 0, functi
 // setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
 // cleanupExpiredRooms();
 server.listen(port, () => {
-    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}`);
+    console.log(`Yapper backend running on https://yapper-backend-pomo.onrender.com`);
 });

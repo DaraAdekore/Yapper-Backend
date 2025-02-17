@@ -17,7 +17,7 @@ const app = express();
 app.use(cookieParser());
 app.use(
     cors({
-        origin: process.env.FRONTEND_URL,
+        origin: [process.env.FRONTEND_URL || `http://localhost:${process.env.PORT}`],
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
@@ -557,5 +557,5 @@ app.get('/api/users/:id', async (req, res) => {
 // cleanupExpiredRooms();
 
 server.listen(port, () => {
-    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}`);
+    console.log(`Yapper backend running on https://yapper-backend-pomo.onrender.com`);
 });
