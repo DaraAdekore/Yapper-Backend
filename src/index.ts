@@ -16,7 +16,6 @@ dotenv.config();
 const app = express();
 app.use(cookieParser());
 app.use(cors({
-    credentials: true,
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept', 'Access-Control-Allow-Origin'],
