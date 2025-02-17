@@ -18,7 +18,7 @@ app.use(cookieParser());
 app.use(express.json());
 
 // Add OPTIONS handling for preflight requests
-// app.options('*', cors());
+app.options('*', cors());
 
 const port = process.env.PORT;
 const pool = new Pool({
