@@ -19,17 +19,10 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const pg_1 = require("pg");
-const cors_1 = __importDefault(require("cors"));
 const websocket_2 = require("./websocket");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
-app.use((0, cors_1.default)({
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
-    exposedHeaders: ['Set-Cookie']
-}));
 app.use(express_1.default.json());
 // Add OPTIONS handling for preflight requests
 // app.options('*', cors());
