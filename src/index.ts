@@ -24,7 +24,7 @@ app.use(express.json());
 // Add OPTIONS handling for preflight requests
 // app.options('*', cors());
 
-const port = process.env.PORT;
+const port = process.env.PORT || 3312;
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {

@@ -31,7 +31,7 @@ app.use((0, cors_1.default)({
 app.use(express_1.default.json());
 // Add OPTIONS handling for preflight requests
 // app.options('*', cors());
-const port = process.env.PORT;
+const port = process.env.PORT || 3312;
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
