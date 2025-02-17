@@ -15,7 +15,6 @@ dotenv.config();
 
 const app = express();
 app.use(cookieParser());
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 app.use(
     cors({
         origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -558,5 +557,5 @@ app.get('/api/users/:id', async (req, res) => {
 // cleanupExpiredRooms();
 
 server.listen(port, () => {
-    console.log(`Yapper backend running on http://localhost:${port}`);
+    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}:${port}`);
 });

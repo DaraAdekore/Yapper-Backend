@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -14,7 +23,7 @@ const setupWebSocket = (server, pool) => {
     const wss = new ws_1.WebSocketServer({ server });
     wss.on("connection", (ws) => {
         console.log("Client connected");
-        ws.on("message", async (message) => {
+        ws.on("message", (message) => __awaiter(void 0, void 0, void 0, function* () {
             var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
             try {
                 const data = JSON.parse(message.toString());
@@ -22,27 +31,27 @@ const setupWebSocket = (server, pool) => {
                     case types_1.MessageType.CREATE_ROOM:
                         if (data.name && data.latitude && data.longitude && data.userId) {
                             try {
-                                const client = await pool.connect();
+                                const client = yield pool.connect();
                                 try {
-                                    await client.query('BEGIN');
+                                    yield client.query('BEGIN');
                                     // Get creator's info
-                                    const creatorResult = await client.query('SELECT username FROM users WHERE id = $1', [data.userId]);
+                                    const creatorResult = yield client.query('SELECT username FROM users WHERE id = $1', [data.userId]);
                                     const creatorUsername = (_a = creatorResult.rows[0]) === null || _a === void 0 ? void 0 : _a.username;
                                     // Create the room
-                                    const roomResult = await client.query(`INSERT INTO rooms (name, latitude, longitude, creator_id) 
+                                    const roomResult = yield client.query(`INSERT INTO rooms (name, latitude, longitude, creator_id) 
                                          VALUES ($1, $2, $3, $4) 
                                          RETURNING id, name, latitude, longitude, creator_id, created_at`, [data.name, data.latitude, data.longitude, data.userId]);
                                     const newRoom = roomResult.rows[0];
                                     // Add creator to user_rooms
-                                    await client.query(`INSERT INTO user_rooms (user_id, room_id) 
+                                    yield client.query(`INSERT INTO user_rooms (user_id, room_id) 
                                          VALUES ($1, $2)`, [data.userId, newRoom.id]);
                                     // Find users within 100km radius
-                                    const nearbyUsers = await client.query(`SELECT id 
+                                    const nearbyUsers = yield client.query(`SELECT id 
                                          FROM users 
                                          WHERE (6371 * acos(cos(radians($1)) * cos(radians(latitude)) * 
                                                cos(radians(longitude) - radians($2)) + 
                                                sin(radians($1)) * sin(radians(latitude)))) <= 100`, [data.latitude, data.longitude]);
-                                    await client.query('COMMIT');
+                                    yield client.query('COMMIT');
                                     // Create room notification message
                                     const roomCreatedMessage = {
                                         type: types_1.MessageType.ROOM_CREATED,
@@ -80,7 +89,7 @@ const setupWebSocket = (server, pool) => {
                                     (_c = exports.connections.get(newRoom.id)) === null || _c === void 0 ? void 0 : _c.add(ws);
                                 }
                                 catch (error) {
-                                    await client.query('ROLLBACK');
+                                    yield client.query('ROLLBACK');
                                     throw error;
                                 }
                                 finally {
@@ -105,9 +114,9 @@ const setupWebSocket = (server, pool) => {
                     case types_1.MessageType.SEND_MESSAGE:
                         if (data.roomId && data.content && data.userId) {
                             try {
-                                const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
+                                const userResult = yield pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
                                 const username = (_d = userResult.rows[0]) === null || _d === void 0 ? void 0 : _d.username;
-                                const result = await pool.query(`INSERT INTO messages (room_id, user_id, content, created_at) 
+                                const result = yield pool.query(`INSERT INTO messages (room_id, user_id, content, created_at) 
                                      VALUES ($1, $2, $3, NOW()) 
                                      RETURNING id, room_id, user_id, content, created_at`, [data.roomId, data.userId, data.content]);
                                 const newMessage = result.rows[0];
@@ -143,12 +152,12 @@ const setupWebSocket = (server, pool) => {
                     case types_1.MessageType.LOAD_ROOM_MESSAGES:
                         if (data.roomId) {
                             try {
-                                const messagesResult = await pool.query(`SELECT m.id, m.user_id, m.content, m.created_at, u.username
+                                const messagesResult = yield pool.query(`SELECT m.id, m.user_id, m.content, m.created_at, u.username
                                      FROM messages m
                                      JOIN users u ON m.user_id = u.id
                                      WHERE m.room_id = $1 
                                      ORDER BY m.created_at ASC`, [data.roomId]);
-                                const roomResult = await pool.query("SELECT * FROM rooms WHERE id = $1", [data.roomId]);
+                                const roomResult = yield pool.query("SELECT * FROM rooms WHERE id = $1", [data.roomId]);
                                 ws.send(JSON.stringify({
                                     type: types_1.MessageType.LOAD_ROOM_MESSAGES,
                                     roomId: data.roomId,
@@ -169,7 +178,7 @@ const setupWebSocket = (server, pool) => {
                         break;
                     case types_1.MessageType.ROOMS_UPDATE:
                         try {
-                            const { rows } = await pool.query(`
+                            const { rows } = yield pool.query(`
                                 SELECT r.*, 
                                     EXISTS(
                                         SELECT 1 
@@ -190,7 +199,7 @@ const setupWebSocket = (server, pool) => {
                     case types_1.MessageType.NEARBY_ROOMS:
                         if (data.latitude && data.longitude) {
                             try {
-                                const { rows } = await pool.query(`SELECT r.*, 
+                                const { rows } = yield pool.query(`SELECT r.*, 
                                         (6371 * acos(cos(radians($1)) * cos(radians(r.latitude)) * 
                                         cos(radians(r.longitude) - radians($2)) + 
                                         sin(radians($1)) * sin(radians(r.latitude)))) AS distance
@@ -213,14 +222,14 @@ const setupWebSocket = (server, pool) => {
                         if (data.roomId && data.userId) {
                             try {
                                 // First check if user is already in the room
-                                const existingMembership = await pool.query(`SELECT id FROM user_rooms WHERE user_id = $1 AND room_id = $2`, [data.userId, data.roomId]);
+                                const existingMembership = yield pool.query(`SELECT id FROM user_rooms WHERE user_id = $1 AND room_id = $2`, [data.userId, data.roomId]);
                                 console.log(existingMembership.rows);
                                 if (existingMembership.rows.length === 0) {
                                     // Get user info
-                                    const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
+                                    const userResult = yield pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
                                     const username = (_f = userResult.rows[0]) === null || _f === void 0 ? void 0 : _f.username;
                                     // Insert new membership
-                                    await pool.query(`INSERT INTO user_rooms (user_id, room_id) 
+                                    yield pool.query(`INSERT INTO user_rooms (user_id, room_id) 
                                          VALUES ($1, $2)`, [data.userId, data.roomId]);
                                     // Update WebSocket connections
                                     if (!exports.userRooms.has(data.userId)) {
@@ -255,10 +264,10 @@ const setupWebSocket = (server, pool) => {
                         if (data.roomId && data.userId) {
                             try {
                                 // Get user info for notification
-                                const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
+                                const userResult = yield pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
                                 const username = (_k = userResult.rows[0]) === null || _k === void 0 ? void 0 : _k.username;
                                 // Remove from user_rooms table
-                                await pool.query(`DELETE FROM user_rooms 
+                                yield pool.query(`DELETE FROM user_rooms 
                                      WHERE user_id = $1 AND room_id = $2`, [data.userId, data.roomId]);
                                 // Update WebSocket connections
                                 (_l = exports.userRooms.get(data.userId)) === null || _l === void 0 ? void 0 : _l.delete(data.roomId);
@@ -304,7 +313,7 @@ const setupWebSocket = (server, pool) => {
             catch (error) {
                 console.error("Error processing message:", error);
             }
-        });
+        }));
         ws.on("close", () => {
             console.log("Client disconnected");
             exports.connections.forEach((clients, roomId) => {

@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -11,51 +20,118 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const pg_1 = require("pg");
 const cors_1 = __importDefault(require("cors"));
-const types_1 = require("./types");
 const websocket_2 = require("./websocket");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
-    origin: 'http://localhost:3000', // Frontend URL
-    credentials: true, // Allow cookies
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 app.use(express_1.default.json());
 const port = process.env.PORT;
 const pool = new pg_1.Pool({
-    user: 'dara',
-    host: 'localhost',
-    database: 'yapper',
-    password: '',
-    port: 5432,
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Required for Render's PostgreSQL
+    }
+});
+// Test database connection
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+        console.error('Database connection failed:', err);
+    }
+    else {
+        console.log('Database connected');
+    }
+});
+// Cleanup configuration
+const CLEANUP_INTERVAL = 1000 * 60 * 5; // 5 minutes
+const ROOM_EXPIRY = '24 hours';
+const cleanupExpiredRooms = () => __awaiter(void 0, void 0, void 0, function* () {
+    /* Temporarily disabled room cleanup
+    try {
+        // First delete messages from expired rooms
+        await pool.query(`
+            DELETE FROM messages
+            WHERE room_id IN (
+                SELECT id FROM rooms
+                WHERE created_at < NOW() - INTERVAL '${ROOM_EXPIRY}'
+            )
+        `);
+
+        // Then delete user_rooms entries
+        await pool.query(`
+            DELETE FROM user_rooms
+            WHERE room_id IN (
+                SELECT id FROM rooms
+                WHERE created_at < NOW() - INTERVAL '${ROOM_EXPIRY}'
+            )
+        `);
+
+        // Finally delete the rooms and get their IDs
+        const { rows } = await pool.query(`
+            WITH deleted AS (
+                DELETE FROM rooms
+                WHERE created_at < NOW() - INTERVAL '${ROOM_EXPIRY}'
+                RETURNING id
+            )
+            SELECT id FROM deleted;
+        `);
+
+        if (rows.length > 0) {
+            console.log(`Cleaned up ${rows.length} expired rooms`);
+            
+            // Clean up WebSocket connections
+            rows.forEach(({ id }) => {
+                if (connections.has(id)) {
+                    const roomConnections = connections.get(id);
+                    roomConnections?.forEach(ws => {
+                        ws.send(JSON.stringify({
+                            type: MessageType.ERROR,
+                            message: 'Room has expired'
+                        }));
+                        ws.close();
+                    });
+                    connections.delete(id);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error cleaning up expired rooms:', error);
+    }
+    */
+    console.log('Room cleanup temporarily disabled');
 });
 const server = http_1.default.createServer(app);
 (0, websocket_1.setupWebSocket)(server, pool);
-const getUserByEmail = async (email) => {
+const getUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     const query = `SELECT * FROM users WHERE email = $1`;
-    const result = await pool.query(query, [email]);
+    const result = yield pool.query(query, [email]);
     return result.rows[0];
-};
+});
 const encodedPassword = (password) => {
     // Simple base64 encoding with a salt
     const salt = '4509809fgdjkn4454j5jkj62jk6'; // In production, use a proper random salt per user
     const encoded = Buffer.from(salt + password).toString('base64');
     return encoded;
 };
-const updateUserLocation = async (userId, latitude, longitude) => {
+const updateUserLocation = (userId, latitude, longitude) => __awaiter(void 0, void 0, void 0, function* () {
     const query = `
         UPDATE users
         SET latitude = $1, longitude = $2
         WHERE id = $3
     `;
     const values = [latitude, longitude, userId];
-    await pool.query(query, values); // Replace `db.query` with your database query function
-};
-app.post('/login', async (req, res) => {
+    yield pool.query(query, values); // Replace `db.query` with your database query function
+});
+app.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password, latitude, longitude } = req.body;
     try {
         // Fetch user by email
-        const user = await getUserByEmail(email);
+        const user = yield getUserByEmail(email);
         if (!user) {
             res.status(404).send('User not found');
             return;
@@ -87,8 +163,8 @@ app.post('/login', async (req, res) => {
         console.error('Error during login:', error);
         res.status(500).send('Internal server error');
     }
-});
-app.post('/location', async (req, res) => {
+}));
+app.post('/location', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { latitude, longitude, id } = req.body;
     const query = `
         UPDATE users
@@ -96,16 +172,16 @@ app.post('/location', async (req, res) => {
         WHERE id = $3
     `;
     try {
-        const result = await pool.query(query, [latitude, longitude, id]);
+        const result = yield pool.query(query, [latitude, longitude, id]);
         res.status(200).json({ success: true, message: 'Location updated' });
     }
     catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
-});
+}));
 // Define the endpoint
-app.post('/rooms', async (req, res) => {
+app.post('/rooms', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userLat, userLng, radius, searchT, userId } = req.body;
     if (!userLat || !userLng) {
         res.status(400).send({ error: 'Latitude and longitude are required.' });
@@ -151,21 +227,21 @@ app.post('/rooms', async (req, res) => {
             queryParams.push(...searchT.map((term) => `%${term}%`));
         }
         query += ` ORDER BY distance ASC;`;
-        const { rows } = await pool.query(query, queryParams);
+        const { rows } = yield pool.query(query, queryParams);
         res.status(200).json(rows);
     }
     catch (err) {
         console.error(err);
         res.status(500).send({ error: 'Failed to fetch rooms.' });
     }
-});
-app.post("/leave-room", async (req, res) => {
+}));
+app.post("/leave-room", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId, roomId } = req.body;
     if (!userId || !roomId) {
         res.status(400).json({ error: "User ID and Room ID are required" });
     }
     try {
-        const result = await pool.query(`DELETE FROM user_rooms WHERE user_id = $1 AND room_id = $2 RETURNING *`, [userId, roomId]);
+        const result = yield pool.query(`DELETE FROM user_rooms WHERE user_id = $1 AND room_id = $2 RETURNING *`, [userId, roomId]);
         if (result.rowCount === 0) {
             res.status(404).json({ error: "User is not in the specified room" });
         }
@@ -175,15 +251,15 @@ app.post("/leave-room", async (req, res) => {
         console.error("Error leaving room:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-});
-app.post("/joined-rooms", async (req, res) => {
+}));
+app.post("/joined-rooms", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId } = req.body;
     console.log("Received userId:", userId);
     if (!userId || userId === "null" || userId.trim() === "") {
         res.status(400).json({ error: "Valid user ID is required" });
     }
     try {
-        const result = await pool.query(`SELECT r.id, r.name, r.latitude, r.longitude, ur.joined_at 
+        const result = yield pool.query(`SELECT r.id, r.name, r.latitude, r.longitude, ur.joined_at 
              FROM rooms r
              JOIN user_rooms ur ON r.id = ur.room_id
              WHERE ur.user_id = $1
@@ -195,13 +271,13 @@ app.post("/joined-rooms", async (req, res) => {
         console.error("Error fetching joined rooms:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-});
-app.post('/register', async (req, res) => {
+}));
+app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { username, email, password, latitude, longitude } = req.body;
     const hashedPassword = encodedPassword(password);
     const query = `INSERT INTO users (username, email, password_hash, latitude, longitude) VALUES ($1, $2, $3, $4, $5)`;
-    const result = await pool.query(query, [username, email, hashedPassword, latitude, longitude]);
-    const user = await getUserByEmail(email);
+    const result = yield pool.query(query, [username, email, hashedPassword, latitude, longitude]);
+    const user = yield getUserByEmail(email);
     const token = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.cookie('token', token, {
         httpOnly: true,
@@ -209,7 +285,7 @@ app.post('/register', async (req, res) => {
         sameSite: 'none',
     });
     res.status(200).send({ id: user.id, username: user.username, email: user.email, latitude: user.latitude, longitude: user.longitude, token: true });
-});
+}));
 app.post('/logout', (req, res) => {
     res.clearCookie('token', {
         httpOnly: true,
@@ -233,7 +309,7 @@ app.get('/verify-token', (req, res) => {
         return;
     }
 });
-app.post('/api/rooms/join', async (req, res) => {
+app.post('/api/rooms/join', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { userId, roomId } = req.body;
     if (!roomId) {
@@ -241,7 +317,7 @@ app.post('/api/rooms/join', async (req, res) => {
     }
     try {
         // Check if room exists and get room data with creator info
-        const roomResult = await pool.query(`
+        const roomResult = yield pool.query(`
             SELECT r.*, creator.username as creator_username
             FROM rooms r
             LEFT JOIN users creator ON r.creator_id = creator.id
@@ -252,9 +328,9 @@ app.post('/api/rooms/join', async (req, res) => {
             res.status(404).json({ error: "Room not found" });
         }
         // Add user to room
-        await pool.query(`INSERT INTO user_rooms (user_id, room_id) VALUES ($1, $2)`, [userId, roomId]);
+        yield pool.query(`INSERT INTO user_rooms (user_id, room_id) VALUES ($1, $2)`, [userId, roomId]);
         // Get messages with user info
-        const messagesResult = await pool.query(`
+        const messagesResult = yield pool.query(`
             SELECT 
                 m.id,
                 m.content as text,
@@ -272,7 +348,7 @@ app.post('/api/rooms/join', async (req, res) => {
         }
         (_a = websocket_2.userRooms.get(userId)) === null || _a === void 0 ? void 0 : _a.add(roomId);
         // Get joining user's username
-        const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [userId]);
+        const userResult = yield pool.query('SELECT username FROM users WHERE id = $1', [userId]);
         const username = (_b = userResult.rows[0]) === null || _b === void 0 ? void 0 : _b.username;
         // Notify other users
         const roomConnections = websocket_2.connections.get(roomId);
@@ -302,8 +378,8 @@ app.post('/api/rooms/join', async (req, res) => {
         console.error('Error joining room:', error);
         res.status(500).json({ error: "Failed to join room" });
     }
-});
-app.get('/api/search-rooms', async (req, res) => {
+}));
+app.get('/api/search-rooms', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { radius, searchTerm, userId } = req.query;
     const searchTermStr = (searchTerm === null || searchTerm === void 0 ? void 0 : searchTerm.toString()) || '';
     const radiusNum = radius ? Number(radius) : null;
@@ -313,7 +389,7 @@ app.get('/api/search-rooms', async (req, res) => {
     }
     try {
         // Validate user exists and has coordinates
-        const userResult = await pool.query(`SELECT latitude, longitude 
+        const userResult = yield pool.query(`SELECT latitude, longitude 
              FROM users 
              WHERE id = $1 
              AND latitude IS NOT NULL 
@@ -370,7 +446,7 @@ app.get('/api/search-rooms', async (req, res) => {
             ${whereClause}
             ORDER BY distance ASC, r.created_at DESC
         `;
-        const result = await pool.query(query, queryParams);
+        const result = yield pool.query(query, queryParams);
         const rooms = result.rows.map(room => (Object.assign(Object.assign({}, room), { distance: Math.round(room.distance * 10) / 10 })));
         res.json({
             rooms,
@@ -385,8 +461,8 @@ app.get('/api/search-rooms', async (req, res) => {
         console.error('Search error:', err);
         res.status(500).json({ error: 'Failed to search rooms' });
     }
-});
-app.get('/api/users/:id', async (req, res) => {
+}));
+app.get('/api/users/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.params.id;
         const query = `
@@ -400,7 +476,7 @@ app.get('/api/users/:id', async (req, res) => {
             FROM users 
             WHERE id = $1
         `;
-        const result = await pool.query(query, [userId]);
+        const result = yield pool.query(query, [userId]);
         if (result.rows.length === 0) {
             res.status(404).json({
                 error: 'User not found'
@@ -423,45 +499,10 @@ app.get('/api/users/:id', async (req, res) => {
             error: 'Failed to fetch user'
         });
     }
-});
-const CLEANUP_INTERVAL = 1000 * 60 * 5; // Run every 5 minutes
-const cleanupExpiredRooms = async () => {
-    try {
-        // Delete expired rooms and get their IDs
-        const { rows } = await pool.query(`
-            WITH deleted AS (
-                DELETE FROM rooms 
-                WHERE created_at < NOW() - INTERVAL '24 hours'
-                RETURNING id
-            )
-            SELECT id FROM deleted;
-        `);
-        if (rows.length > 0) {
-            console.log(`Cleaned up ${rows.length} expired rooms`);
-            // Clean up WebSocket connections for deleted rooms
-            rows.forEach(({ id }) => {
-                if (websocket_2.connections.has(id)) {
-                    const roomConnections = websocket_2.connections.get(id);
-                    roomConnections === null || roomConnections === void 0 ? void 0 : roomConnections.forEach(ws => {
-                        ws.send(JSON.stringify({
-                            type: types_1.MessageType.ERROR,
-                            message: 'Room has expired'
-                        }));
-                        ws.close();
-                    });
-                    websocket_2.connections.delete(id);
-                }
-            });
-        }
-    }
-    catch (error) {
-        console.error('Error cleaning up expired rooms:', error);
-    }
-};
-// Start the cleanup interval after server initialization
-setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
-// Run initial cleanup when server starts
-cleanupExpiredRooms();
+}));
+// Temporarily disabled
+// setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
+// cleanupExpiredRooms();
 server.listen(port, () => {
-    console.log(`Yapper backend running on http://localhost:${port}`);
+    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}:${port}`);
 });
