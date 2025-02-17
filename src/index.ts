@@ -17,6 +17,7 @@ const app = express();
 app.use(cookieParser());
 app.use(cors({
     credentials: true,
+    origin: 'https://yapper-2d1p.onrender.com'
 }));
 app.use(express.json());
 
