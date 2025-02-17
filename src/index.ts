@@ -16,8 +16,13 @@ dotenv.config();
 const app = express();
 app.use(cookieParser());
 app.use(
-    cors())
-;
+    cors({  // Allow both production and local
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
+        exposedHeaders: ['Set-Cookie']
+    })
+);
 app.use(express.json());
 
 // Add OPTIONS handling for preflight requests
