@@ -131,19 +131,19 @@ app.post('/rooms', async (req, res) => {
                 FROM messages m 
                 JOIN users u ON m.user_id = u.id 
                 WHERE m.room_id = r.id) as messages,
-                (6371 * ACOS(
-                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
-                    COS(RADIANS(r.longitude) - RADIANS($2)) +
-                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                (6371 * acos(
+                    cos(radians($1)) * cos(radians(r.latitude)) *
+                    cos(radians(r.longitude) - radians($2)) +
+                    sin(radians($1)) * sin(radians(r.latitude))
                 )) AS distance,
                 EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id) as "isJoined"
             FROM rooms r
             LEFT JOIN users creator ON r.creator_id = creator.id
-            WHERE (6371 * ACOS(
-                COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
-                COS(RADIANS(r.longitude) - RADIANS($2)) +
-                SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
-            )) <= $3 OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id))
+            WHERE (6371 * acos(
+                cos(radians($1)) * cos(radians(r.latitude)) *
+                cos(radians(r.longitude) - radians($2)) +
+                sin(radians($1)) * sin(radians(r.latitude))
+            ) <= $3) OR EXISTS(SELECT 1 FROM user_rooms ur WHERE ur.user_id = $4 AND ur.room_id = r.id)
         `;
         const queryParams = [userLat, userLng, radius, userId];
         if (searchT === null || searchT === void 0 ? void 0 : searchT.length) {
@@ -359,10 +359,11 @@ app.get('/api/search-rooms', async (req, res) => {
                 r.creator_id,
                 u.username AS creator_username,
                 r.created_at,
-                (6371 * ACOS(
-                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
-                    COS(RADIANS(r.longitude) - RADIANS($2)) +
-                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                r.created_at as created_by,
+                (6371 * acos(
+                    cos(radians($1)) * cos(radians(r.latitude)) *
+                    cos(radians(r.longitude) - radians($2)) +
+                    sin(radians($1)) * sin(radians(r.latitude))
                 )) AS distance
             FROM rooms r
             LEFT JOIN users u ON r.creator_id = u.id

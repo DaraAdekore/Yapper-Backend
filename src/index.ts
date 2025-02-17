@@ -404,10 +404,11 @@ app.get('/api/search-rooms', async (req, res) => {
                 r.creator_id,
                 u.username AS creator_username,
                 r.created_at,
-                (6371 * ACOS(
-                    COS(RADIANS($1)) * COS(RADIANS(r.latitude)) *
-                    COS(RADIANS(r.longitude) - RADIANS($2)) +
-                    SIN(RADIANS($1)) * SIN(RADIANS(r.latitude))
+                r.created_at as created_by,
+                (6371 * acos(
+                    cos(radians($1)) * cos(radians(r.latitude)) *
+                    cos(radians(r.longitude) - radians($2)) +
+                    sin(radians($1)) * sin(radians(r.latitude))
                 )) AS distance
             FROM rooms r
             LEFT JOIN users u ON r.creator_id = u.id
