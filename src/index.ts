@@ -27,11 +27,10 @@ app.use(
 app.use(express.json());
 const port = process.env.PORT;
 const pool = new Pool({
-    user: 'dara',
-    host: 'localhost',
-    database: 'yapper',
-    password: '',
-    port: 5432,
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Required for Render's PostgreSQL
+    }
 });
 const server = http.createServer(app);
 
