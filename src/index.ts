@@ -15,10 +15,13 @@ dotenv.config();
 
 const app = express();
 app.use(cookieParser());
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 app.use(
     cors({
-        origin: 'http://localhost:3000', // Frontend URL
-        credentials: true, // Allow cookies
+        origin: [FRONTEND_URL], // Can be an array of allowed origins
+        credentials: true, // Keep this if you're using cookies/auth
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
     })
 );
 app.use(express.json());
