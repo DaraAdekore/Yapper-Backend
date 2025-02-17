@@ -25,12 +25,15 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
-    origin: [process.env.FRONTEND_URL || `http://localhost:${process.env.PORT}`],
+    origin: ['https://yapper-2d1p.onrender.com', 'http://localhost:3000'], // Allow both production and local
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
+    exposedHeaders: ['Set-Cookie']
 }));
 app.use(express_1.default.json());
+// Add OPTIONS handling for preflight requests
+app.options('*', (0, cors_1.default)());
 const port = process.env.PORT;
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
@@ -503,6 +506,14 @@ app.get('/api/users/:id', (req, res) => __awaiter(void 0, void 0, void 0, functi
 // Temporarily disabled
 // setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
 // cleanupExpiredRooms();
+// Add error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
 server.listen(port, () => {
     console.log(`Yapper backend running on https://yapper-backend-pomo.onrender.com`);
 });

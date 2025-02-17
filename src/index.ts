@@ -17,13 +17,18 @@ const app = express();
 app.use(cookieParser());
 app.use(
     cors({
-        origin: [process.env.FRONTEND_URL || `http://localhost:${process.env.PORT}`],
+        origin: ['https://yapper-2d1p.onrender.com', 'http://localhost:3000'],  // Allow both production and local
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
+        exposedHeaders: ['Set-Cookie']
     })
 );
 app.use(express.json());
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors());
+
 const port = process.env.PORT;
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -555,6 +560,15 @@ app.get('/api/users/:id', async (req, res) => {
 // Temporarily disabled
 // setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
 // cleanupExpiredRooms();
+
+// Add error handling middleware
+app.use((err: any, req: Request, res: Response, next: any) => {
+    console.error('Error:', err);
+    res.status(500).json({ 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
 
 server.listen(port, () => {
     console.log(`Yapper backend running on https://yapper-backend-pomo.onrender.com`);

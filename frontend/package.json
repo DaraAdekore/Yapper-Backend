@@ -5,6 +5,5 @@
       ".localhost",
       "yapper-backend-pomo.onrender.com"
     ]
-  },
-  "proxy": "https://yapper-backend-pomo.onrender.com"
+  }
 } 
