@@ -17,7 +17,7 @@ const app = express();
 app.use(cookieParser());
 app.use(cors({
     credentials: true,
-    origin: 'https://yapper-2d1p.onrender.com', // Ensure this matches your frontend URL exactly
+    origin: true, // Ensure this matches your frontend URL exactly
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
     exposedHeaders: ['Set-Cookie'],
