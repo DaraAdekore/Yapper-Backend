@@ -557,5 +557,5 @@ app.get('/api/users/:id', async (req, res) => {
 // cleanupExpiredRooms();
 
 server.listen(port, () => {
-    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}:${port}`);
+    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}`);
 });
