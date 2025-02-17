@@ -26,14 +26,39 @@ const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
     credentials: true,
-    origin: true, // Ensure this matches your frontend URL exactly
+    origin: [
+        'https://yapper-2d1p.onrender.com', // Frontend base
+        'https://yapper-2d1p.onrender.com/login', // Auth endpoints
+        'https://yapper-2d1p.onrender.com/register',
+        'https://yapper-2d1p.onrender.com/logout',
+        'https://yapper-2d1p.onrender.com/verify-token',
+        'https://yapper-2d1p.onrender.com/rooms', // Room endpoints
+        'https://yapper-2d1p.onrender.com/api/rooms/join',
+        'https://yapper-2d1p.onrender.com/api/search-rooms',
+        'https://yapper-2d1p.onrender.com/api/users/:id', // User endpoints
+        'https://yapper-backend-pomo.onrender.com', // Backend base
+        'http://localhost:3000', // Local development
+        'http://localhost:3312'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept'],
     exposedHeaders: ['Set-Cookie'],
 }));
 app.use(express_1.default.json());
-// Add OPTIONS handling for preflight requests
-// app.options('*', cors());
+// Add explicit CORS for each endpoint
+const routes = [
+    '/login',
+    '/register',
+    '/logout',
+    '/verify-token',
+    '/rooms',
+    '/api/rooms/join',
+    '/api/search-rooms',
+    '/api/users/:id'
+];
+routes.forEach(route => {
+    app.options(route, (0, cors_1.default)());
+});
 const port = process.env.PORT || 3312;
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
