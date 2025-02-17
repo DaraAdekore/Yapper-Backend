@@ -31,7 +31,7 @@ app.use((0, cors_1.default)({
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 app.use(express_1.default.json());
-const port = process.env.PORT;
+const port = 3312;
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -504,5 +504,5 @@ app.get('/api/users/:id', (req, res) => __awaiter(void 0, void 0, void 0, functi
 // setInterval(cleanupExpiredRooms, CLEANUP_INTERVAL);
 // cleanupExpiredRooms();
 server.listen(port, () => {
-    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}:${port}`);
+    console.log(`Yapper backend running on ${process.env.REACT_APP_API_URL}`);
 });

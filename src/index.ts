@@ -24,7 +24,7 @@ app.use(
     })
 );
 app.use(express.json());
-const port = process.env.PORT;
+const port = 3312;
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
