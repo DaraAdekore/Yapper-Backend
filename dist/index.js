@@ -26,7 +26,10 @@ const app = (0, express_1.default)();
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
     credentials: true,
-    origin: 'https://yapper-2d1p.onrender.com'
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Origin', 'Accept', 'Access-Control-Allow-Origin'],
+    exposedHeaders: ['Set-Cookie']
 }));
 app.use(express_1.default.json());
 // Add OPTIONS handling for preflight requests
