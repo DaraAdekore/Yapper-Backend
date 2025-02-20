@@ -116,9 +116,14 @@ const setupWebSocket = (server, pool) => {
                             try {
                                 const userResult = yield pool.query('SELECT username FROM users WHERE id = $1', [data.userId]);
                                 const username = (_d = userResult.rows[0]) === null || _d === void 0 ? void 0 : _d.username;
-                                const result = yield pool.query(`INSERT INTO messages (room_id, user_id, content, created_at) 
-                                     VALUES ($1, $2, $3, NOW()) 
-                                     RETURNING id, room_id, user_id, content, created_at`, [data.roomId, data.userId, data.content]);
+                                const result = yield pool.query(`INSERT INTO messages (room_id, user_id, content) 
+                                     VALUES ($1, $2, $3) 
+                                     RETURNING 
+                                        id, 
+                                        room_id, 
+                                        user_id, 
+                                        content, 
+                                        to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at`, [data.roomId, data.userId, data.content]);
                                 const newMessage = result.rows[0];
                                 // Create message payload
                                 const messagePayload = {
@@ -152,11 +157,16 @@ const setupWebSocket = (server, pool) => {
                     case types_1.MessageType.LOAD_ROOM_MESSAGES:
                         if (data.roomId) {
                             try {
-                                const messagesResult = yield pool.query(`SELECT m.id, m.user_id, m.content, m.created_at, u.username
-                                     FROM messages m
-                                     JOIN users u ON m.user_id = u.id
-                                     WHERE m.room_id = $1 
-                                     ORDER BY m.created_at ASC`, [data.roomId]);
+                                const messagesResult = yield pool.query(`SELECT 
+                                        m.id, 
+                                        m.user_id, 
+                                        m.content, 
+                                        to_char(m.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
+                                        u.username
+                                    FROM messages m
+                                    JOIN users u ON m.user_id = u.id
+                                    WHERE m.room_id = $1 
+                                    ORDER BY m.created_at ASC`, [data.roomId]);
                                 const roomResult = yield pool.query("SELECT * FROM rooms WHERE id = $1", [data.roomId]);
                                 ws.send(JSON.stringify({
                                     type: types_1.MessageType.LOAD_ROOM_MESSAGES,
