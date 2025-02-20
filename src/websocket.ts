@@ -162,9 +162,14 @@ export const setupWebSocket = (server: Server, pool: Pool) => {
                                 const username = userResult.rows[0]?.username;
 
                             const result = await pool.query(
-                                    `INSERT INTO messages (room_id, user_id, content, created_at) 
-                                     VALUES ($1, $2, $3, NOW()) 
-                                     RETURNING id, room_id, user_id, content, created_at`,
+                                    `INSERT INTO messages (room_id, user_id, content) 
+                                     VALUES ($1, $2, $3) 
+                                     RETURNING 
+                                        id, 
+                                        room_id, 
+                                        user_id, 
+                                        content, 
+                                        to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at`,
                                     [data.roomId, data.userId, data.content]
                                 );
                                 
@@ -196,7 +201,7 @@ export const setupWebSocket = (server: Server, pool: Pool) => {
                                     type: MessageType.ERROR,
                                     message: 'Failed to send message'
                                 }));
-                            }
+                        }
                     }
                     break;
 
@@ -204,11 +209,16 @@ export const setupWebSocket = (server: Server, pool: Pool) => {
                         if (data.roomId) {
                             try {
                                 const messagesResult = await pool.query(
-                                    `SELECT m.id, m.user_id, m.content, m.created_at, u.username
-                                     FROM messages m
-                                     JOIN users u ON m.user_id = u.id
-                                     WHERE m.room_id = $1 
-                                     ORDER BY m.created_at ASC`,
+                                    `SELECT 
+                                        m.id, 
+                                        m.user_id, 
+                                        m.content, 
+                                        to_char(m.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
+                                        u.username
+                                    FROM messages m
+                                    JOIN users u ON m.user_id = u.id
+                                    WHERE m.room_id = $1 
+                                    ORDER BY m.created_at ASC`,
                                     [data.roomId]
                                 );
 

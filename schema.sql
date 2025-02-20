@@ -16,14 +16,15 @@ CREATE TABLE rooms (
     latitude DECIMAL(10, 6) NOT NULL,
     longitude DECIMAL(10, 6) NOT NULL,
     creator_id UUID REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP + interval '24 hours'
 );
 
 -- User-Room relationships
 CREATE TABLE user_rooms (
     user_id UUID REFERENCES users(id),
     room_id UUID REFERENCES rooms(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, room_id)
 );
 
@@ -34,4 +35,21 @@ CREATE TABLE messages (
     user_id UUID REFERENCES users(id),
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-); 
+);
+
+-- Update messages table
+ALTER TABLE messages 
+ALTER COLUMN created_at TYPE timestamp with time zone,
+ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+
+-- Update user_rooms table
+ALTER TABLE user_rooms 
+ALTER COLUMN joined_at TYPE timestamp with time zone,
+ALTER COLUMN joined_at SET DEFAULT CURRENT_TIMESTAMP;
+
+-- Update rooms table
+ALTER TABLE rooms 
+ALTER COLUMN created_at TYPE timestamp with time zone,
+ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
+ALTER COLUMN expires_at TYPE timestamp with time zone,
+ALTER COLUMN expires_at SET DEFAULT CURRENT_TIMESTAMP + interval '24 hours'; 
